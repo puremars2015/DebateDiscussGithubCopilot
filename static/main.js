@@ -1,4 +1,19 @@
 document.addEventListener('DOMContentLoaded', function(){
+  // show pending link only for admin users
+  try{
+    const token = localStorage.getItem('token') || null;
+    if (token){
+      const parts = token.split('.');
+      if (parts.length === 3){
+        const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+        if (payload.is_admin){
+          const l = document.getElementById('pending-link');
+          if (l) l.classList.remove('hidden');
+        }
+      }
+    }
+  }catch(e){ /* ignore */ }
+
   const loginForm = document.getElementById('loginForm');
   if (loginForm){
     loginForm.addEventListener('submit', async function(e){

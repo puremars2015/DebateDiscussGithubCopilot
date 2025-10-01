@@ -16,6 +16,10 @@ migrate.init_app(app, db)
 # import models and utils after extensions initialized to avoid circular import
 from models import User, DebateTopic, Debate, Round, Vote, MatchHistory
 from utils import calculate_elo, compute_round_result
+from auth import bp as auth_bp
+
+# register blueprints
+app.register_blueprint(auth_bp)
 
 @app.context_processor
 def inject_now():
@@ -31,6 +35,23 @@ def index():
     per_page = 8
     q = DebateTopic.query
     if show == 'pending':
+        # require admin
+        admin_ok = False
+        auth = request.headers.get('Authorization')
+        admin_secret = request.args.get('admin_secret') or request.headers.get('X-ADMIN-SECRET') or app.config.get('ADMIN_SECRET')
+        if admin_secret and admin_secret == app.config.get('ADMIN_SECRET'):
+            admin_ok = True
+        if auth and auth.startswith('Bearer '):
+            token = auth.split(None,1)[1]
+            try:
+                import jwt
+                payload = jwt.decode(token, app.config.get('JWT_SECRET','dev-jwt-secret'), algorithms=['HS256'])
+                if payload.get('is_admin'):
+                    admin_ok = True
+            except Exception:
+                admin_ok = admin_ok
+        if not admin_ok:
+            return render_template('index.html', topics=[])
         q = q.filter(DebateTopic.status=='pending')
     else:
         q = q.filter(DebateTopic.status=='approved')
@@ -91,9 +112,28 @@ def apply_topic():
 
 @app.route('/api/topics', methods=['GET'])
 def list_topics():
+    # protect pending topics: only admin can query pending
     status = request.args.get('status')
     q = DebateTopic.query
     if status:
+        if status == 'pending':
+            # check admin via JWT or ADMIN_SECRET header
+            admin_ok = False
+            auth = request.headers.get('Authorization')
+            admin_secret = request.headers.get('X-ADMIN-SECRET') or app.config.get('ADMIN_SECRET')
+            if admin_secret and request.args.get('admin_secret') == admin_secret:
+                admin_ok = True
+            if auth and auth.startswith('Bearer '):
+                token = auth.split(None,1)[1]
+                try:
+                    import jwt
+                    payload = jwt.decode(token, app.config.get('JWT_SECRET','dev-jwt-secret'), algorithms=['HS256'])
+                    if payload.get('is_admin'):
+                        admin_ok = True
+                except Exception:
+                    admin_ok = admin_ok
+            if not admin_ok:
+                return jsonify({'error':'admin required to view pending topics'}), 403
         q = q.filter_by(status=status)
     topics = q.all()
     out = []
@@ -120,6 +160,29 @@ def admin_reject(topic_id):
     t.reviewed_at = datetime.utcnow()
     db.session.commit()
     return jsonify({'topic_id': t.topic_id, 'status': t.status})
+
+
+@app.route('/api/admin/promote', methods=['POST'])
+def admin_promote():
+    # protect with ADMIN_SECRET header or app config
+    provided = request.headers.get('X-ADMIN-SECRET') or request.json.get('admin_secret')
+    expected = app.config.get('ADMIN_SECRET') or os.environ.get('ADMIN_SECRET')
+    if not expected or provided != expected:
+        return jsonify({'error':'invalid admin secret'}), 403
+
+    data = request.get_json() or {}
+    user_id = data.get('user_id')
+    line_id = data.get('line_id')
+    user = None
+    if user_id:
+        user = User.query.get(user_id)
+    elif line_id:
+        user = User.query.filter_by(line_id=line_id).first()
+    if not user:
+        return jsonify({'error':'user not found'}), 404
+    user.is_admin = True
+    db.session.commit()
+    return jsonify({'user_id': user.user_id, 'is_admin': True})
 
 
 @app.route('/api/debates/create', methods=['POST'])
