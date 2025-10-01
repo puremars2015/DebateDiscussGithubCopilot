@@ -1,0 +1,17 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Logging in...</title>
+    <script>
+      (function(){
+        const token = '{{ token }}';
+        try{ localStorage.setItem('token', token); }catch(e){}
+        window.location = '/';
+      })();
+    </script>
+  </head>
+  <body>
+    <p>Logging in... Redirecting.</p>
+  </body>
+  </html>

@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+
+{% block title %}議題列表 - 辯論網站{% endblock %}
+
+{% block content %}
+  <div class="mb-6 flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-semibold">公開議題</h1>
+      <p class="text-sm text-gray-500">點擊議題檢視詳情或申請成為候選辯題。</p>
+    </div>
+    <div class="flex items-center gap-3">
+      <a href="/apply" class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-500">申請新議題</a>
+      <a href="/?show=pending" class="text-sm text-gray-600 hover:underline">查看待審</a>
+    </div>
+  </div>
+
+  <div class="grid gap-6 grid-cols-1 md:grid-cols-2">
+    {% for t in topics %}
+    <div class="bg-white p-5 rounded shadow-sm">
+      <div class="flex items-start justify-between">
+        <div>
+          <h2 class="text-lg font-medium text-gray-800"><a href="/topics/{{ t.topic_id }}" class="hover:text-indigo-600">{{ t.title }}</a></h2>
+          <p class="text-sm text-gray-500 mt-2">{{ t.description or '' }}</p>
+        </div>
+        <div class="text-right">
+          {% if t.status == 'pending' %}
+            <span class="px-3 py-1 rounded-full text-sm bg-yellow-100 text-yellow-800">待審</span>
+          {% else %}
+            <span class="px-3 py-1 rounded-full text-sm bg-green-100 text-green-800">已上架</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% else %}
+    <div class="col-span-1 md:col-span-2 text-gray-500">目前沒有已上架的議題。</div>
+    {% endfor %}
+  </div>
+  <div class="mt-6 flex items-center justify-center">
+    <nav class="inline-flex rounded-md shadow-sm" role="navigation" aria-label="Pagination">
+      <a href="/?show={{ request.args.get('show') or '' }}&page={{ (request.args.get('page')|int(default=1)) - 1 }}" class="px-3 py-2 bg-white border text-gray-700 rounded-l hover:bg-gray-50">上一頁</a>
+      <a href="/?show={{ request.args.get('show') or '' }}&page={{ (request.args.get('page')|int(default=1)) + 1 }}" class="px-3 py-2 bg-white border text-gray-700 rounded-r hover:bg-gray-50">下一頁</a>
+    </nav>
+  </div>
+{% endblock %}
